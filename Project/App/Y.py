@@ -18,13 +18,24 @@ class Application(tk.Tk):
         self.configure(bg="#e6eaec")
         # Load the icon
         self.current_path = os.getcwd()
-        icon = tk.PhotoImage(file=os.path.join(self.current_path, "Y/App/Y_icon.png"))  # Replace with your icon file path
+        icon = tk.PhotoImage(file=os.path.join(self.current_path, "Y_icon.png"))  # Replace with your icon file path
         self.iconphoto(False, icon)
 
         self.init_login_screen()
 
     def connect(self):
         self.client_socket.connect((self.host, self.port))
+    
+    def send_request(self, request_type, args):
+        message = {
+            "type": request_type
+        }
+        message.update(args)
+        message_string = json.dumps(message) + "\n"
+        self.client_socket.sendall(message_string.encode('utf-8'))
+        response = self.client_socket.recv(1000000000).decode('utf-8')
+        print(response)
+        return response
 
     def init_login_screen(self):
         self.login_frame = tk.Frame(self, bg="#e6eaec")
@@ -34,7 +45,7 @@ class Application(tk.Tk):
         container.place(relx=0.5, rely=0.5, anchor="center")
 
         # Load the image with PIL and resize it
-        pil_image = Image.open(os.path.join(self.current_path, "Y/App/Y_icon.png")) # Replace with your image path
+        pil_image = Image.open(os.path.join(self.current_path, "Y_icon.png")) # Replace with your image path
         pil_image = pil_image.resize((180, 170), Image.LANCZOS)  # Resize to 150x150 or your desired size
 
         self.login_image = ImageTk.PhotoImage(pil_image)
@@ -68,21 +79,12 @@ class Application(tk.Tk):
             self.error_label.config(text="Please fill in all fields.")
             return
         else:
-            message = {
-                "type": "LOGIN",  # Adding the identifier
-                "username": self.username,
-                "password": password
-            }
-            message_string = json.dumps(message)
-            self.client_socket.sendall(message_string+"\n".encode('utf-8'))
-            response = self.client_socket.recv(1000)
-            if response == "NULL_USER":
+            response = self.send_request("LOGIN", {"username": self.username, "password": password})
+            if response == "NULL_LOGIN\n":
                 self.error_label.config(text="Invalid username or password.")
-                return
-            elif response == "OK":
+            elif response == "OK\n":
                 self.error_label.config(text="")
                 self.login_frame.destroy()
-
                 self.create_widgets()
             else: return
 
@@ -133,10 +135,11 @@ class Application(tk.Tk):
         self.search_results_frame.pack_forget()
 
         # Add buttons to the functions_frame
-        ttk.Button(self.functions_frame, text="Home").pack(pady=(10,10))
+        ttk.Button(self.functions_frame, text="Home",command=self.return_home).pack(pady=(10,10))
         ttk.Button(self.functions_frame, text="Refresh", command = self.refresh_feed).pack(pady=(10,10))
-        ttk.Button(self.functions_frame, text="Profile").pack(pady=(10,10))
+        ttk.Button(self.functions_frame, text="New Post").pack(pady=(10,10))
         ttk.Button(self.functions_frame, text="Log Out", command = self.logout).pack(side="bottom")
+        ttk.Button(self.functions_frame, text="Profile").pack(side="bottom",pady=(10,20))
 
         # Delay populating the feed to ensure layout is updated
         self.after(50, self.load_feed)
@@ -146,12 +149,43 @@ class Application(tk.Tk):
         # Placeholder for server communication
         if search_query!="":
             #response = self.send_search_query_to_server(search_query)
-            response="null_user"
-            if response == "null_user":
-                # Display error in reversed text
+            response=self.send_request("GET_USER", {"username": search_query})
+            if response == "NULL_USER\n":
+                # Display error
                 messagebox.showerror("Error", "No results found for: " +search_query)
             else:
-                self.open_user()
+                self.open_user(search_query,response)
+    def open_profile(self):
+        response=self.send_request("GET_USER", {"username": self.username})
+        self.open_user(self.username,response)
+        
+    def open_user(self, username, response):
+        # Close existing overlay if it's open
+        self.close_user_overlay()
+
+        # Create an overlay frame
+        self.user_overlay = tk.Frame(self, bg="lightgray", width=self.width, height=self.winfo_height())
+        self.user_overlay.place(relx=0.5, rely=0.5, anchor="center")
+
+        # Add a label to show the username
+        tk.Label(self.user_overlay, text=username, font=("Calibri", 16)).pack(pady=10)
+
+        # Iterate over the response and create labels for each post
+        for post in response:
+            post_frame = tk.Frame(self.user_overlay, bg="white", bd=0, relief="flat")
+            tk.Label(post_frame, text=post['username'], font=("Calibri", 14, "bold")).pack(padx=10, pady=10, fill='x')
+            tk.Label(post_frame, text=post['content'], font=("Calibri", 12)).pack(padx=10, pady=(5,20), fill='x')
+            post_frame.pack(fill=tk.X, padx=10, pady=0)
+
+        # Add a close button to the overlay
+        close_button = ttk.Button(self.user_overlay, text="Close", command=self.close_user_overlay)
+        close_button.pack(pady=10)
+
+    def close_user_overlay(self):
+        if hasattr(self, 'user_overlay'):
+            self.user_overlay.destroy()
+
+
 
     def create_feed_frame(self):
         # Create a canvas and a scrollbar
@@ -175,31 +209,35 @@ class Application(tk.Tk):
         """ Truncate text to a maximum length, appending ellipsis if truncated. """
         return text if len(text) <= max_length else text[:max_length-3] + "..."
 
+    def load_user(self,username):
+        self.user_frame
+
+    def return_home(self):
+        if hasattr(self, 'user_frame'):
+            self.user_frame.destroy()
+
     def load_feed(self):
         # Update the UI and calculate wraplength based on the width of the scrollable_frame
         self.update_idletasks()
-        wrap_length = self.width*0.60
+        self.wrap_length = self.width*0.60
         # Sample Titles and Contents
-        sample_titles = ["usuario_1", "usuario_2", "usuario_3", "usuario_4", "usuario_5"]
-        sample_contents = ["Dissuade ecstatic and properly saw entirely sir why laughter endeavor. In on my jointure horrible margaret suitable he followed speedily. Indeed vanity excuse or mr lovers of on. By offer scale an stuff. Blush be sorry no sight. Sang lose of hour then he left find. \n Talking chamber as shewing an it minutes. Trees fully of blind do. Exquisite favourite at do extensive listening. Improve up musical welcome he. Gay attended vicinity prepared now diverted. Esteems it ye sending reached as. Longer lively her design settle tastes advice mrs off who.","Maids table how learn drift but purse stand yet set. Music me house could among oh as their. Piqued our sister shy nature almost his wicket. Hand dear so we hour to. He we be hastily offence effects he service. Sympathize it projection ye insipidity celebrated my pianoforte indulgence. Point his truth put style. Elegance exercise as laughing proposal mistaken if. We up precaution an it solicitude acceptance invitation.","We diminution preference thoroughly if. Joy deal pain view much her..","Nice post","Good morning"]
+        feed_json = self.send_request("FEED", {"username": self.username})
+        print(feed_json)
+        feed = json.loads(feed_json)  # Convert JSON string to Python list
 
-        for i in range(len(sample_titles)*10):
-            post_title = sample_titles[i%5]
-            post_content = sample_contents[i%5]
+        for post in feed:
+            post_frame = tk.Frame(self.feed_frame, width=self.width*0.85, bg="white", bd=0, relief="flat", highlightbackground="#e6eaec", highlightcolor="#e6eaec", highlightthickness=1)
+            # Username
+            tk.Label(post_frame, text=post['username'], bg="white", fg="black", font=("Calibri", 14, "bold"), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=10, fill='x')
+            # Content
+            tk.Label(post_frame, text=post['content'], bg="white", fg="black", font=("Calibri", 12), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=(5,20), fill='x')
 
-            post_frame = tk.Frame(self.feed_frame,width=self.width*0.85, bg="white", bd=0, relief="flat", highlightbackground="#e6eaec", highlightcolor="#e6eaec", highlightthickness=1)
-            #username
-            tk.Label(post_frame, text=post_title, bg="white", fg="black", font=("Calibri", 14, "bold"), wraplength=wrap_length, anchor='w', justify='left').pack(padx=10, pady=10, fill='x')
-            #Content
-            tk.Label(post_frame, text=post_content, bg="white", fg="black", font=("Calibri", 12), wraplength=wrap_length, anchor='w', justify='left').pack(padx=10, pady=5, fill='x')
-            #Spacer
-            tk.Label(post_frame, text="", bg="white", fg="black", font=("Calibri", 14, "bold"), wraplength=wrap_length, anchor='w', justify='left').pack(padx=0, pady=0, fill='x')
+            post_frame.pack(fill=tk.X, padx=10, pady=0, anchor="center")
 
-            post_frame.pack(fill=tk.X, padx=10, pady=0,anchor="center")
-        self.after(5, lambda: self.canvas.yview_moveto(0))
+            self.after(5, lambda: self.canvas.yview_moveto(0))
 
     def on_mousewheel(self, event, canvas):
-        scroll_speed_windows = 1
+        scroll_speed_windows = 2
         scroll_speed_other = 3
 
         if platform.system() == "Windows":
@@ -232,12 +270,13 @@ class Application(tk.Tk):
             self.top_frame.destroy()
         if hasattr(self, 'search_results_frame'):
             self.search_results_frame.destroy()
+        self.send_request("LOGOUT", {"username": self.username})
         self.username=""
         #Return to login Page
         self.after(100, lambda: self.init_login_screen())
     
     def terminate(self): 
-        self.client_socket.sendall("CLOSE".encode())
+        self.send_request("CLOSE","")
         self.client_socket.close()
         self.destroy()
         

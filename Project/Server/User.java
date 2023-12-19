@@ -9,10 +9,10 @@ public class User {
 
     private String bio;
 
-    protected List posts;
+    private LinkedList<Post> posts;
 
-    private List followers;
-    private List following;
+    private LinkedList<String> followers;
+    private LinkedList<String> following;
 
     public User(String username) {
         this.username = username;
@@ -24,26 +24,51 @@ public class User {
     public String getUsername() {
         return this.username;
     }
-    public List getFollowers() {
+
+    public LinkedList<String> addPost(Post post) {
+        this.posts.add(post);
+    return followers;
+    }
+    
+    public LinkedList<String> getFollowers() {
         return followers;
     }
 
-    public List getFollowing() {
+    public LinkedList<String> getFollowing() {
         return following;
     }
-
-    public List<Post> getPosts() {
+    public LinkedList<String> putFollowing(String user) {
+        this.following.add(user);
+        return following;
+    }
+    public LinkedList<String> setFollowing(LinkedList<String> list) {
+        this.following = list;
+        return following;
+    }
+    public LinkedList<String> putFollower(String user) {
+        this.followers.add(user);
+        return followers;
+    }
+    public LinkedList<String> removeFollowing(String user) {
+        this.following.remove(user);
+        return following;
+    }
+    public LinkedList<String> removeFollower(String user) {
+        this.following.remove(user);
+        return following;
+    }
+    public LinkedList<Post> getPosts() {
         return this.posts;
     }
 
-    public void setPosts(List<Post> posts) {
+    public void setPosts(LinkedList<Post> posts) {
         this.posts = posts;
     }
        
     @Override
     public String toString() {
         StringBuilder str = new StringBuilder();
-        str.append(this.username.toString()).append(this.followers.toString()).append(this.following.toString());
+        str.append(this.username.toString());
         return str.toString();
     }
 

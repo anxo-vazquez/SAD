@@ -1,5 +1,7 @@
 package y;
 
+import java.time.LocalDate;
+
 /**
  *
  * @author anxovazquez
@@ -18,9 +20,11 @@ public class Post {
 
     private int dislikes;
 
-    public Post(User user, String title, String text) {
-        this.title = title;
+    private LocalDate currentDate;
+
+    public Post(User user,LocalDate date, String text) {
         this.user = user;
+        this.currentDate = date;
         this.text = text;
     }
 
@@ -40,10 +44,12 @@ public class Post {
         this.user = user;
     }
 
-    public String getText() {
+    public String getContent() {
         return text;
     }
-
+    public LocalDate getDate() {
+        return this.currentDate;
+    }
     public void setText(String text) {
         this.text = text;
     }
@@ -59,7 +65,7 @@ public class Post {
     @Override
     public String toString() {
         StringBuilder str = new StringBuilder();
-        str.append(this.title.toString()).append(this.user.toString()).append(this.text.toString());
+        str.append(this.user.toString()).append(this.text.toString());
         return str.toString();
     }
 
