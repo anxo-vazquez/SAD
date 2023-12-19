@@ -139,7 +139,7 @@ class Application(tk.Tk):
         ttk.Button(self.functions_frame, text="Refresh", command = self.refresh_feed).pack(pady=(10,10))
         ttk.Button(self.functions_frame, text="New Post").pack(pady=(10,10))
         ttk.Button(self.functions_frame, text="Log Out", command = self.logout).pack(side="bottom")
-        ttk.Button(self.functions_frame, text="Profile").pack(side="bottom",pady=(10,20))
+        ttk.Button(self.functions_frame, text="Profile",command=self.open_profile).pack(side="bottom",pady=(10,20))
 
         # Delay populating the feed to ensure layout is updated
         self.after(50, self.load_feed)
@@ -155,37 +155,67 @@ class Application(tk.Tk):
                 messagebox.showerror("Error", "No results found for: " +search_query)
             else:
                 self.open_user(search_query,response)
+
     def open_profile(self):
         response=self.send_request("GET_USER", {"username": self.username})
         self.open_user(self.username,response)
-        
+    
     def open_user(self, username, response):
-        # Close existing overlay if it's open
-        self.close_user_overlay()
+        # Create a new top-level window
+        self.floating_window = tk.Toplevel(self, bg="#e6eaec")
+        self.floating_window.title("User Details")
 
-        # Create an overlay frame
-        self.user_overlay = tk.Frame(self, bg="lightgray", width=self.width, height=self.winfo_height())
-        self.user_overlay.place(relx=0.5, rely=0.5, anchor="center")
+        # Set the window to always stay on top
+        self.floating_window.attributes('-topmost', True)
 
-        # Add a label to show the username
-        tk.Label(self.user_overlay, text=username, font=("Calibri", 16)).pack(pady=10)
+        # Create widgets inside the floating window
+        label = tk.Label(self.floating_window, text=f"{username}", font=("Calibri", 30, "bold"), justify='left', bg="#e6eaec")
+        label.pack(pady=1)
 
-        # Iterate over the response and create labels for each post
-        for post in response:
-            post_frame = tk.Frame(self.user_overlay, bg="white", bd=0, relief="flat")
-            tk.Label(post_frame, text=post['username'], font=("Calibri", 14, "bold")).pack(padx=10, pady=10, fill='x')
-            tk.Label(post_frame, text=post['content'], font=("Calibri", 12)).pack(padx=10, pady=(5,20), fill='x')
-            post_frame.pack(fill=tk.X, padx=10, pady=0)
-
-        # Add a close button to the overlay
-        close_button = ttk.Button(self.user_overlay, text="Close", command=self.close_user_overlay)
+        # Close button
+        close_button = ttk.Button(self.floating_window, text="Close", command=self.close_user_overlay)
         close_button.pack(pady=10)
 
+        # Position the floating window
+        self.floating_window.geometry(self.geometry())  # Adjust size as needed
+        self.scrollable_frame_user = tk.Frame(self.floating_window, bg="#e6eaec", bd=10)
+        self.scrollable_frame_user.pack(side="top", fill="both", expand=True)
+        
+        self.canvas_user = tk.Canvas(self.scrollable_frame_user, bg="#e6eaec", highlightthickness=0, borderwidth=0)
+        self.scrollbar_user = ttk.Scrollbar(self.scrollable_frame_user, orient="vertical", command=self.canvas_user.yview)
+        
+        self.canvas_user.configure(yscrollcommand=self.scrollbar_user.set)
+        self.canvas_user.pack(side="left", fill="both", expand=True, anchor="center")
+        self.scrollbar_user.pack(side="right", fill="y")
+
+        # Create feed_frame inside the canvas
+        self.feed_frame_user = tk.Frame(self.canvas_user, bg="#e6eaec", highlightthickness=0)
+        self.canvas_user.create_window((0, 0), window=self.feed_frame_user, anchor="center")
+
+        def on_frame_configure(event):
+            self.canvas_user.configure(scrollregion=self.canvas_user.bbox("all"))
+
+        self.feed_frame_user.bind("<Configure>", on_frame_configure)
+        self.bind_all("<MouseWheel>", lambda event: self.on_mousewheel_user(event, self.canvas_user))
+
+        feed_user = json.loads(response)  # Convert JSON string to Python list
+
+        for post in feed_user:
+            post_frame = tk.Frame(self.feed_frame_user, width=self.width*0.85, bg="white", bd=0, relief="flat", highlightbackground="#e6eaec", highlightcolor="#e6eaec", highlightthickness=1)
+            # Username
+            tk.Label(post_frame, text=post['username'], bg="white", fg="black", font=("Calibri", 14, "bold"), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=10, fill='x')
+            # Content
+            tk.Label(post_frame, text=post['content'], bg="white", fg="black", font=("Calibri", 12), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=(5,20), fill='x')
+
+            post_frame.pack(fill=tk.X, padx=10, pady=0, anchor="center")
+
+            self.after(5, lambda: self.canvas_user.yview_moveto(0))
+        # Optionally, you can make the window stay on top
+        # floating_frame.attributes('-topmost', True)
+
     def close_user_overlay(self):
-        if hasattr(self, 'user_overlay'):
-            self.user_overlay.destroy()
-
-
+        self.floating_window.destroy()
+        self.bind_all("<MouseWheel>", lambda event: self.on_mousewheel(event, self.canvas))
 
     def create_feed_frame(self):
         # Create a canvas and a scrollbar
@@ -245,7 +275,17 @@ class Application(tk.Tk):
         else:
             delta = int(-1*event.delta) * scroll_speed_other
         canvas.yview_scroll(delta, "units")
-    
+       
+    def on_mousewheel_user(self, event, canvas):
+        scroll_speed_windows = 2
+        scroll_speed_other = 3
+
+        if platform.system() == "Windows":
+            delta = int(-1*(event.delta/120)) * scroll_speed_windows
+        else:
+            delta = int(-1*event.delta) * scroll_speed_other
+        canvas.yview_scroll(delta, "units") 
+
     def refresh_feed(self):
         # Destroy existing feed frame and recreate it
         self.canvas.destroy()
