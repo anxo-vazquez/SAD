@@ -8,7 +8,14 @@ package y;
 public class Message {
     private String type;
     private String username;
+    private String content;
 
+    public String getContent() {
+        return content;
+    }
+    public void setContent(String content) {
+        this.content = content;
+    }
     public String getType() {
         return type;
     }

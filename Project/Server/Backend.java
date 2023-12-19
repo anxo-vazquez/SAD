@@ -43,7 +43,6 @@ public class Backend {
                     feedPosts.addAll(followingUser.getPosts());
                 }
             }
-
             // Sort by date (assuming Post has a date attribute) and limit to 100 posts
             feedPosts.sort(Comparator.comparing(Post::getDate).reversed());
             System.out.println(feedPosts.toString());

@@ -137,7 +137,7 @@ class Application(tk.Tk):
         # Add buttons to the functions_frame
         ttk.Button(self.functions_frame, text="Home",command=self.return_home).pack(pady=(10,10))
         ttk.Button(self.functions_frame, text="Refresh", command = self.refresh_feed).pack(pady=(10,10))
-        ttk.Button(self.functions_frame, text="New Post").pack(pady=(10,10))
+        ttk.Button(self.functions_frame, text="New Post",command=self.create_post).pack(pady=(10,10))
         ttk.Button(self.functions_frame, text="Log Out", command = self.logout).pack(side="bottom")
         ttk.Button(self.functions_frame, text="Profile",command=self.open_profile).pack(side="bottom",pady=(10,20))
 
@@ -155,6 +155,57 @@ class Application(tk.Tk):
                 messagebox.showerror("Error", "No results found for: " +search_query)
             else:
                 self.open_user(search_query,response)
+
+    def create_feed_frame(self):
+        # Create a canvas and a scrollbar
+        self.canvas = tk.Canvas(self.scrollable_frame, bg="#e6eaec",highlightthickness=0, borderwidth=0)
+        self.scrollbar = ttk.Scrollbar(self.scrollable_frame, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True, anchor="center")
+        self.scrollbar.pack(side="right", fill="y")
+
+        # Create feed_frame inside the canvas
+        self.feed_frame = tk.Frame(self.canvas, bg="#e6eaec", highlightthickness=0)
+        self.canvas.create_window((0, 0), window=self.feed_frame, anchor="center")
+
+        def on_frame_configure(event):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+        self.feed_frame.bind("<Configure>", on_frame_configure)
+        self.bind_all("<MouseWheel>", lambda event: self.on_mousewheel(event, self.canvas))
+    
+    def truncate_text(self, text, max_length):
+        """ Truncate text to a maximum length, appending ellipsis if truncated. """
+        return text if len(text) <= max_length else text[:max_length-3] + "..."
+
+    def load_user(self,username):
+        self.user_frame
+
+    def return_home(self):
+        if hasattr(self, 'user_frame'):
+            self.user_frame.destroy()
+        if hasattr(self, 'post_frame'):
+            self.post_frame.destroy()
+
+    def load_feed(self):
+        # Update the UI and calculate wraplength based on the width of the scrollable_frame
+        self.update_idletasks()
+        self.wrap_length = self.width*0.60
+        # Sample Titles and Contents
+        feed_json = self.send_request("FEED", {"username": self.username})
+        print(feed_json)
+        feed = json.loads(feed_json)  # Convert JSON string to Python list
+
+        for post in feed:
+            post_frame = tk.Frame(self.feed_frame, width=self.width*0.85, bg="white", bd=0, relief="flat", highlightbackground="#e6eaec", highlightcolor="#e6eaec", highlightthickness=1)
+            # Username
+            tk.Label(post_frame, text=post['username'], bg="white", fg="black", font=("Calibri", 14, "bold"), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=10, fill='x')
+            # Content
+            tk.Label(post_frame, text=post['content'], bg="white", fg="black", font=("Calibri", 12), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=(5,20), fill='x')
+
+            post_frame.pack(fill=tk.X, padx=10, pady=0, anchor="center")
+
+            self.after(5, lambda: self.canvas.yview_moveto(0))
 
     def open_profile(self):
         response=self.send_request("GET_USER", {"username": self.username})
@@ -217,54 +268,34 @@ class Application(tk.Tk):
         self.floating_window.destroy()
         self.bind_all("<MouseWheel>", lambda event: self.on_mousewheel(event, self.canvas))
 
-    def create_feed_frame(self):
-        # Create a canvas and a scrollbar
-        self.canvas = tk.Canvas(self.scrollable_frame, bg="#e6eaec",highlightthickness=0, borderwidth=0)
-        self.scrollbar = ttk.Scrollbar(self.scrollable_frame, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.canvas.pack(side="left", fill="both", expand=True, anchor="center")
-        self.scrollbar.pack(side="right", fill="y")
+    def create_post(self):
+        # Create a frame for the overlay
+        self.overlay_frame = tk.Frame(self, bg="#e6eaec", bd=10)
+        self.overlay_frame.place(relx=0.5, rely=0.5, anchor="center",width=self.winfo_width(),height=self.winfo_height())  # Adjust size as needed
 
-        # Create feed_frame inside the canvas
-        self.feed_frame = tk.Frame(self.canvas, bg="#e6eaec", highlightthickness=0)
-        self.canvas.create_window((0, 0), window=self.feed_frame, anchor="center")
+        # Create widgets inside the overlay frame
+        label = tk.Label(self.overlay_frame, text=f"{self.username}", font=("Calibri", 30, "bold"), justify='left', bg="#e6eaec")
+        label.pack(pady=1)
 
-        def on_frame_configure(event):
-            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self.new_post = tk.Text(self.overlay_frame, wrap="word", font=("Calibri", 12), height=5)
+        self.new_post.pack(padx=10, pady=5, fill='both', expand=True)
 
-        self.feed_frame.bind("<Configure>", on_frame_configure)
-        self.bind_all("<MouseWheel>", lambda event: self.on_mousewheel(event, self.canvas))
+        # Post button
+        post_button = ttk.Button(self.overlay_frame, text="Post", command=self.send_post)
+        post_button.pack(pady=10)
+
+        # Close button
+        close_button = ttk.Button(self.overlay_frame, text="Close", command=self.close_post_overlay)
+        close_button.pack(pady=10)
+
+    def send_post(self):
+        self.new_post_content = self.new_post.get("1.0", "end-1c")
+        response = self.send_request("POST", {"username": self.username,"content": self.new_post_content})
+        print(response)
+        self.close_post_overlay()
     
-    def truncate_text(self, text, max_length):
-        """ Truncate text to a maximum length, appending ellipsis if truncated. """
-        return text if len(text) <= max_length else text[:max_length-3] + "..."
-
-    def load_user(self,username):
-        self.user_frame
-
-    def return_home(self):
-        if hasattr(self, 'user_frame'):
-            self.user_frame.destroy()
-
-    def load_feed(self):
-        # Update the UI and calculate wraplength based on the width of the scrollable_frame
-        self.update_idletasks()
-        self.wrap_length = self.width*0.60
-        # Sample Titles and Contents
-        feed_json = self.send_request("FEED", {"username": self.username})
-        print(feed_json)
-        feed = json.loads(feed_json)  # Convert JSON string to Python list
-
-        for post in feed:
-            post_frame = tk.Frame(self.feed_frame, width=self.width*0.85, bg="white", bd=0, relief="flat", highlightbackground="#e6eaec", highlightcolor="#e6eaec", highlightthickness=1)
-            # Username
-            tk.Label(post_frame, text=post['username'], bg="white", fg="black", font=("Calibri", 14, "bold"), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=10, fill='x')
-            # Content
-            tk.Label(post_frame, text=post['content'], bg="white", fg="black", font=("Calibri", 12), wraplength=self.wrap_length, anchor='w', justify='left').pack(padx=10, pady=(5,20), fill='x')
-
-            post_frame.pack(fill=tk.X, padx=10, pady=0, anchor="center")
-
-            self.after(5, lambda: self.canvas.yview_moveto(0))
+    def close_post_overlay(self):
+        self.overlay_frame.destroy()
 
     def on_mousewheel(self, event, canvas):
         scroll_speed_windows = 2

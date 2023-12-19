@@ -2,6 +2,7 @@ package y;
 
 import java.io.*;
 import java.net.*;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.*;
 import com.google.gson.Gson;
@@ -113,7 +114,15 @@ public class Server {
                         String usrJson = gsonP.toJson(usr);
                         System.out.println(usr.toString());
                         out.println(usrJson); // Send the feed as a JSON string
-                    } else {
+                    }} else if (received.getType().equals("POST")) {
+                    if (this.backend.getUsers().containsKey(received.getUsername())) {
+                        System.out.println(received.getContent());
+                        Post post = new Post(this.backend.getUsers().get(received.getUsername()),LocalDate.now(),received.getContent());
+                        this.backend.getUser(received.getUsername()).addPost(post);
+                        System.out.println(post.toString());
+                        out.println("POST_OK"); // Send the feed as a JSON string 
+                    }
+                    else {
                         out.println("NULL_USER"); // Send the error
 
                     }
