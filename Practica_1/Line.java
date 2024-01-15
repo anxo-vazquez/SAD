@@ -1,44 +1,114 @@
-package Practica_1;
+import java.util.ArrayList;
+import java.util.Observable;
 
-/**
- *
- * @author anxovazquez
- */
-public class Line {
+public class Line extends Observable {
+    static final int MOVE_RIGHT = 2001;
+    static final int MOVE_LEFT = 2002;
+    static final int MOVE_START = 2000;
+    static final int TOGGLE_INSERT = 2004;
+    static final int REMOVE_CHARACTER = 2005;
+    static final int BACKSPACE_ACTION = 127;
+    static final int ESCAPE_ACTION = 2000;
+    static final int MOVE_END = 2003;
+    static final int ADD_CHARACTER = 2006;
+    static final int FINALIZE_INPUT = 2007;
 
-    protected StringBuilder line;
-    protected int cursor;
-    
+    private int cursorPosition;
+    private boolean isInInsertMode;
+    private ArrayList<Integer> characterBuffer;
+    private char lastChar;
+
     public Line() {
-        this.line = new StringBuilder();
-        this.cursor = 0;
+        this.cursorPosition = 0;
+        this.isInInsertMode = false;
+        this.characterBuffer = new ArrayList<>();
     }
 
-    public StringBuilder getLine() {
-        return this.line;
+    public void finalizeInput() {
+        this.setChanged();
+        this.notifyObservers(FINALIZE_INPUT);
     }
 
-    public StringBuilder put(char c) {
-        this.cursor= this.line.length();
-        this.line.append(c);
-        return this.line;
+    public char getLastChar() {
+        return this.lastChar;
     }
 
-    public StringBuilder remove() {
-        this.line.deleteCharAt(this.cursor);
-        return this.line;
+    public int getCursorPosition() {
+        return this.cursorPosition;
     }
 
-    public StringBuilder insert(char c) {
-        this.line.insert(c,this.cursor);
-        return this.line;
+    public boolean isInInsertMode() {
+        return this.isInInsertMode;
     }
-    public StringBuilder moveCursor(int position){
-        this.cursor+=position;
-        return this.line;
+
+    public void moveCursorRight() {
+        if (this.cursorPosition < this.characterBuffer.size()) {
+            this.cursorPosition++;
+        }
+        this.setChanged();
+        this.notifyObservers(MOVE_RIGHT);
     }
-    @Override
-    public String toString() {
-        return this.line.toString();
+
+    public void moveCursorLeft() {
+        if (this.cursorPosition > 0) {
+            this.cursorPosition--;
+        }
+        this.setChanged();
+        this.notifyObservers(MOVE_LEFT);
+    }
+
+    public void moveToStart() {
+        this.cursorPosition = 0;
+        this.setChanged();
+        this.notifyObservers(MOVE_START);
+    }
+
+    public void moveToEnd() {
+        this.cursorPosition = this.characterBuffer.size();
+        this.setChanged();
+        this.notifyObservers(MOVE_END);
+    }
+
+    public void backspace() {
+        if (this.cursorPosition > 0 && !this.characterBuffer.isEmpty()) {
+            this.characterBuffer.remove(this.cursorPosition - 1);
+            this.moveCursorLeft();
+        }
+        this.setChanged();
+        this.notifyObservers(BACKSPACE_ACTION);
+    }
+
+    public void deleteCharacter() {
+        if (this.cursorPosition < this.characterBuffer.size()) {
+            this.characterBuffer.remove(this.cursorPosition);
+        }
+        this.setChanged();
+        this.notifyObservers(REMOVE_CHARACTER);
+    }
+
+    public String getText() {
+        StringBuilder text = new StringBuilder();
+        for (int charCode : this.characterBuffer) {
+            text.append((char) charCode);
+        }
+        return text.toString();
+    }
+
+    public void addCharacter(int characterCode) {
+        if (this.isInInsertMode && this.cursorPosition < characterBuffer.size()) {
+            this.characterBuffer.set(this.cursorPosition, characterCode);
+        } else {
+            this.characterBuffer.add(this.cursorPosition, characterCode);
+        }
+        this.lastChar = (char) characterCode;
+        this.cursorPosition++;
+        this.setChanged();
+        this.notifyObservers(ADD_CHARACTER);
+    }
+
+    public void toggleInsertMode() {
+        this.isInInsertMode = !this.isInInsertMode;
+        this.setChanged();
+        this.notifyObservers(TOGGLE_INSERT);
     }
 }
